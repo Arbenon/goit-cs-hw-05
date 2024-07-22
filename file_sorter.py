@@ -4,17 +4,20 @@ import aiofiles
 import aiofiles.os
 import logging
 from pathlib import Path
+import argparse
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Func for paths
+# Func for paths using ArgumentParser
 def get_paths():
-    source = input("Введіть шлях до вихідної папки: ")
-    destination = input("Введіть шлях до цільової папки: ")
-    return source, destination
+    parser = argparse.ArgumentParser(description="Копіювання файлів із сортуванням за розширенням.")
+    parser.add_argument("source", help="Шлях до вихідної папки")
+    parser.add_argument("destination", help="Шлях до цільової папки")
+    args = parser.parse_args()
+    return args.source, args.destination
 
-# Async func for coping files
+# Async func for copying files
 async def copy_file(file_path, dest_dir):
     ext = file_path.suffix.lstrip('.').lower()
     target_folder = dest_dir / ext
@@ -34,13 +37,15 @@ async def copy_file(file_path, dest_dir):
 
     logging.info(f"Файл {file_path} скопійовано до {dest_path}")
 
-# Async func for reading files
+# Async func for reading folders recursively
 async def read_folder(source_dir, dest_dir):
     tasks = []
-    for root, dirs, files in os.walk(source_dir):
-        for file in files:
-            file_path = Path(os.path.join(root, file))
-            tasks.append(copy_file(file_path, Path(dest_dir)))
+    for entry in os.scandir(source_dir):
+        if entry.is_file():
+            file_path = Path(entry.path)
+            tasks.append(copy_file(file_path, dest_dir))
+        elif entry.is_dir():
+            await read_folder(entry.path, dest_dir)  # рекурсивний виклик для обробки підпапок
 
     if tasks:
         await asyncio.gather(*tasks)
